@@ -1,7 +1,8 @@
-from domain.product import Product
+"""from domain.product import Product
 from domain.order import Order
 from repository.product_repo import ProductRepository
 from repository.order_repo import OrderRepository
+
 
 
 def main():
@@ -28,6 +29,29 @@ def main():
 
     print(f"Total = ${saved_order.calculate_total():.2f}")
 
+
+if __name__ == "__main__":
+    main()"""
+from Repository.product_repo import ProductRepository
+from Repository.order_repo import OrderRepository
+from Service.order_service import OrderService
+
+def main():
+    # Initialize Repositories
+    product_repo = ProductRepository()
+    order_repo = OrderRepository()
+
+    # Initialize Service with its dependencies
+    order_service = OrderService(product_repo, order_repo)
+
+    # Iteration 3: Call order_service.create_order
+    try:
+        # Let's assume products with ID 1 and 2 already exist in your repo
+        order_data = [(1, 2), (2, 1)]
+        new_order = order_service.create_order(order_data)
+        
+    except ValueError as e:
+        print(f"Failed to create order: {e}")
 
 if __name__ == "__main__":
     main()
