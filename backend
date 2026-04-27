@@ -1,0 +1,96 @@
+from flask import Flask, jsonify, request, abort
+from flask_cors import CORS
+
+# Importing your specific Domain, Repository, and Service classes
+from domain.product import Product
+from domain.order import Order
+from repository.product_repo import ProductRepository
+from repository.order_repo import OrderRepository
+from service.order_service import OrderService
+
+app = Flask(__name__)
+CORS(app)
+
+# --- Real Initialization ---
+p_repo = ProductRepository()
+o_repo = OrderRepository()
+service = OrderService(p_repo, o_repo)
+
+# --- Seed Data (Ensures the app isn't empty on startup) ---
+def startup_data():
+    # Adding initial products to the real repository
+    p_repo.add(Product(1, "Mug", 12.50))
+    p_repo.add(Product(2, "Scarf", 25.00))
+    
+    # Optional: Seed an initial order (ID: 1)
+    # Using the service format: [(product_id, quantity)]
+    try:
+        service.create_order([(1, 2), (2, 1)])
+    except Exception as e:
+        print(f"Startup order failed: {e}")
+
+startup_data()
+
+# --- Endpoints ---
+
+# 1. View Products
+@app.route('/products', methods=['GET'])
+def get_products():
+    all_products = p_repo.list_all()
+    # Convert Product objects to dictionaries for JSON
+    return jsonify([p.__dict__ for p in all_products])
+
+# 2. View Orders
+@app.route('/orders', methods=['GET'])
+def get_orders():
+    all_orders = o_repo.list_all()
+    # Returns only IDs as per Requirement 2
+    return jsonify([{"id": o.id} for o in all_orders])
+
+# 3. View Order Details
+@app.route('/orders/<int:order_id>', methods=['GET'])
+def get_order_details(order_id):
+    order = o_repo.get(order_id)
+    if not order:
+        return jsonify({"error": "Order not found"}), 404
+    
+    # Mapping OrderItem objects to a format the frontend understands
+    items_list = []
+    for item in order.items:
+        items_list.append({
+            "product_id": item.product.id,
+            "quantity": item.quantity
+        })
+
+    return jsonify({
+        "id": order.id,
+        "total": order.calculate_total(),
+        "items": items_list
+    })
+
+# 4. Create Order
+@app.route('/enter_orders', methods=['POST'])
+def create_order():
+    data = request.json # { "items": [{"product_id": 1, "quantity": 2}, ...] }
+    
+    # Convert frontend format to the (id, qty) tuples your Service expects
+    try:
+        formatted_items = [(item['product_id'], item['quantity']) for item in data['items']]
+        new_order = service.create_order(formatted_items)
+        return jsonify({"message": "Order created", "id": new_order.id}), 201
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+# 5. Create Product
+@app.route('/products', methods=['POST'])
+def create_product():
+    data = request.json
+    try:
+        new_prod = Product(int(data['id']), data['name'], float(data['price']))
+        p_repo.add(new_prod)
+        return jsonify({"message": "Product created"}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)
