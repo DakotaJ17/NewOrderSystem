@@ -1,4 +1,4 @@
-from Domain.models import Order
+from domain.order import Order
 
 class OrderService:
     def __init__(self, product_repo, order_repo):
@@ -8,31 +8,34 @@ class OrderService:
     def create_order(self, order_items):
         """
         Expects order_items as a list of tuples: [(product_id, quantity), ...]
-        Example: [(1, 2), (2, 1)]
         """
-        
-        # 1. Retrieve items
-        # We fetch the actual product objects to ensure they exist
+        # 1. Retrieve products
         products_to_order = []
         for p_id, qty in order_items:
-            product = self.product_repo.get_by_id(p_id)
+            # Your ProductRepository uses .get(), not .get_by_id()
+            product = self.product_repo.get(p_id) 
             if product:
                 products_to_order.append((product, qty))
             else:
                 raise ValueError(f"Product with ID {p_id} not found.")
 
-        # 2. Validate orders
-        # (e.g., check if there is enough stock)
+        # 2. Validate stock (if you added the stock attribute)
         for product, qty in products_to_order:
-            if product.stock < qty:
+            if hasattr(product, 'stock') and product.stock < qty:
                 raise ValueError(f"Not enough stock for {product.name}.")
 
         # 3. Create order
-        # Calculate total price and instantiate the Domain Model
-        new_order = Order(items=products_to_order)
+        # We need an ID. Let's use the current count + 101 to avoid duplicates.
+        new_id = len(self.order_repo.list_all()) + 101
+        new_order = Order(new_id) # Correct: only passing the ID
         
-        # 4. Save order
-        self.order_repo.add(new_order)
+        # Use the add_item method defined in your order.py
+        for product, qty in products_to_order:
+            new_order.add_item(product, qty)
+        
+        # 4. Save order 
+        # Your OrderRepository uses .save(), not .add()
+        self.order_repo.save(new_order)
         
         print(f"Order {new_order.id} created successfully!")
         return new_order
